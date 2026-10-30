@@ -462,8 +462,17 @@ void CheckSchedSetscheduler() {
     KernelSchedParam saved{};
     Require(scePthreadGetschedparam(self, &savedPolicy, &saved) == 0);
     KernelSchedParam param{700};
+    *__error_nid_postfix() = 0;
     Require(sched_setscheduler_nid_postfix(0, 1, nullptr) == -1 && Error() == 14);
+    *__error_nid_postfix() = 0;
+    Require(sched_setscheduler_nid_postfix(0, 1, reinterpret_cast<const KernelSchedParam*>(0x10)) == -1 && Error() == 14);
+    *__error_nid_postfix() = 0;
+    Require(sched_setscheduler_nid_postfix(getpid_nid_postfix() + 1, 0, nullptr) == -1 && Error() == 14);
+    *__error_nid_postfix() = 0;
+    Require(sched_setscheduler_nid_postfix(getpid_nid_postfix() + 1, 0, reinterpret_cast<const KernelSchedParam*>(0x10)) == -1 && Error() == 14);
+    *__error_nid_postfix() = 0;
     Require(sched_setscheduler_nid_postfix(getpid_nid_postfix() + 1, 1, &param) == -1 && Error() == 3);
+    *__error_nid_postfix() = 0;
     Require(sched_setscheduler_nid_postfix(-1, 1, &param) == -1 && Error() == 3);
     for (const int policy : {-1, 0, 4, 7}) Require(sched_setscheduler_nid_postfix(0, policy, &param) == -1 && Error() == 22);
     int policy = 0;
@@ -473,6 +482,36 @@ void CheckSchedSetscheduler() {
     param.sched_priority = 300;
     Require(sched_setscheduler_nid_postfix(0, 3, &param) == 0);
     Require(scePthreadGetschedparam(self, &policy, &current) == 0 && policy == 3 && current.sched_priority == 300);
+#ifndef __APPLE__
+    const int pid = getpid_nid_postfix();
+    for (const int mainPolicy : {1, 3}) {
+        for (const int priority : {256, 767, 896, 959}) {
+            const KernelSchedParam requested{priority};
+            Require(sched_setscheduler_nid_postfix(pid, mainPolicy, &requested) == 0);
+            Require(scePthreadGetschedparam(self, &policy, &current) == 0 &&
+                policy == mainPolicy && current.sched_priority == priority);
+        }
+        std::thread worker([=] {
+            const Pthread caller = scePthreadSelf();
+            const int workerPolicy = mainPolicy == 1 ? 3 : 1;
+            const KernelSchedParam workerParam{400};
+            Require(sched_setscheduler_nid_postfix(0, workerPolicy, &workerParam) == 0);
+            int observedPolicy = 0;
+            KernelSchedParam observed{};
+            Require(scePthreadGetschedparam(self, &observedPolicy, &observed) == 0 &&
+                observedPolicy == mainPolicy && observed.sched_priority == 959);
+            const KernelSchedParam mainParam{600};
+            Require(sched_setscheduler_nid_postfix(pid, workerPolicy, &mainParam) == 0);
+            Require(scePthreadGetschedparam(self, &observedPolicy, &observed) == 0 &&
+                observedPolicy == workerPolicy && observed.sched_priority == 600);
+            Require(scePthreadGetschedparam(caller, &observedPolicy, &observed) == 0 &&
+                observedPolicy == workerPolicy && observed.sched_priority == 400);
+        });
+        worker.join();
+        Require(scePthreadGetschedparam(self, &policy, &current) == 0 &&
+            policy == (mainPolicy == 1 ? 3 : 1) && current.sched_priority == 600);
+    }
+#endif
     Require(scePthreadSetschedparam(self, savedPolicy, &saved) == 0);
 }
 

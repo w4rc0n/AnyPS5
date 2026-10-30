@@ -208,6 +208,17 @@ static std::unique_lock<std::mutex> SchedTarget(int pid, Pthread& thread, const 
 #endif
 }
 
+int SetSchedTarget_nid_no_patch(int pid, int policy, int priority) {
+    Pthread thread = nullptr;
+    const auto live = SchedTarget(pid, thread, "sched_setscheduler");
+    if (!live.owns_lock()) return PosixThread::GUEST_ESRCH;
+    if (policy != GUEST_SCHED_FIFO && policy != 2 && policy != GUEST_SCHED_RR) return PosixThread::GUEST_EINVAL;
+    if (!AcceptsSchedParam(policy, priority)) return -1;
+    thread->priority.store(priority, std::memory_order_relaxed);
+    thread->schedPolicy.store(policy, std::memory_order_relaxed);
+    return 0;
+}
+
 static int SchedFailure(int error) {
     *__error_nid_postfix() = error;
     return -1;
