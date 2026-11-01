@@ -3,7 +3,7 @@
 ### Unknown function info
 
 - [WebKit API objects](../../../core/libs/prx/libSceNKWebKit/src/Object.hpp) (libSceNKWebKit) - `WK*` objects are host objects numbered with `API::Object::Type` as [APIObject.h](https://github.com/neonmodder123/PS5-WebKit-11.x/blob/80f77e94c63ee7202eec3d4b5b1a021dd89011ba/Source/WebKit/Shared/API/APIObject.h) builds for PlayStation, with ApplicationManifest, InspectorExtension, WebExtension and WebAuthn types off and PopupMenuItem and AccessibilityObject on per [OptionsPlayStation.cmake](https://github.com/neonmodder123/PS5-WebKit-11.x/blob/80f77e94c63ee7202eec3d4b5b1a021dd89011ba/Source/cmake/OptionsPlayStation.cmake); the console module version, its type numbers and its object layouts are unverified, so these objects cannot be passed to a console WebKit module. A null or wrong-type reference throws where WebKit dereferences it.
-- [WTF and WebCore value layouts](../../../core/libs/prx/libSceNKWebKit/src/WtfStringAbi.hpp) (libSceNKWebKit) - `WTF::String`, `StringImpl`, `StringView`, `CString`, `URL` and the WebCore geometry, transform and `Color` layouts follow the release 64-bit headers at the [pinned source](https://github.com/neonmodder123/PS5-WebKit-11.x/blob/80f77e94c63ee7202eec3d4b5b1a021dd89011ba/Source/WTF/wtf/text/StringImpl.h) and are pinned with `static_assert`; they are tested on Windows, not against console binaries. `StringImpl::destroy`, atom and symbol strings and external buffers still throw, so a string whose last reference guest code drops terminates.
+- [WTF and WebCore value layouts](../../../core/libs/prx/libSceNKWebKit/src/WtfStringAbi.hpp) (libSceNKWebKit) - `WTF::String`, `StringImpl`, `StringView`, `CString`, `URL`, `PrintStream`, `StringPrintStream`, `Expected<String, UTF8ConversionError>` and the WebCore geometry, transform and `Color` layouts follow the release 64-bit headers at the [pinned source](https://github.com/neonmodder123/PS5-WebKit-11.x/blob/80f77e94c63ee7202eec3d4b5b1a021dd89011ba/Source/WTF/wtf/text/StringImpl.h) and are pinned with `static_assert`; the stream layouts and no-RTTI vtable are unverified on Windows and against console binaries; the other layouts are tested on Windows. `StringImpl::destroy`, atom and symbol strings and external buffers still throw, so a string whose last reference guest code drops terminates.
 - [Media preferences](../../../core/libs/prx/libSceNKWebKit/src/Preferences.cpp) (libSceNKWebKit) - unset `MediaSourceEnabled`, `EncryptedMediaAPIEnabled` and `SourceBufferChangeTypeEnabled` getters throw, and feature-key setters for `EncryptedMediaAPIEnabled`, `SourceBufferChangeTypeEnabled` and `WebMParserEnabled` throw, because the PlayStation media player configuration behind `ENABLE_MEDIA_SOURCE` and `ENABLE_ENCRYPTED_MEDIA` is not in the pinned source. Other defaults evaluate [UnifiedWebPreferences.yaml](https://github.com/neonmodder123/PS5-WebKit-11.x/blob/80f77e94c63ee7202eec3d4b5b1a021dd89011ba/Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml) for PlayStation; downstream console overrides are unverified.
 
 ### Functional
@@ -27,7 +27,7 @@
 
 - The [revision-pinned identity inventory](https://gist.github.com/kyon-eth/d44995f181e1818977bd38f0e6fc0f34/8afcb14b0707a09b6274ff7f7bcf33ef46cfe2e7) records the module, library, symbol type and NIDs for the declarations in [Export.cpp](../../../core/libs/prx/libSceNKWebKit/Export.cpp); it is a metadata summary rather than independent verification. For the 255 absent from the public catalogue, [per-image ELF records](https://gist.github.com/kyon-eth/147be8dd556e9cced2577ccbed548972/1a659ecfe819e724675991a574a1aebb5fbb48e5) include the raw qualified names, module and library identities, symbol type, values and sizes; the record file SHA-256 is `44bdc4d6073192a8f41b7be359b75364b3d41dbbd11ce649924b8cebdd4ffe51`. Image labels are not authenticated.
 
-- [Additional callable exports](../../../core/libs/prx/libSceNKWebKit/Export.cpp) - 7439 of the 8703 inventory declarations listed below throw through `NotImplemented_nid_no_patch`; signatures and behavior are unverified. The later 13.60-labelled image contains all 8703; 8448 match the public 3.20 catalogue, while 255 are absent and their presence in retail 3.20 is unverified. Per-image records show the latter in a separate 3.20-labelled image, but neither image label is authenticated. Identified names match NIDs in the [public symbol database](https://github.com/zecoxao/sce_symbols/blob/2883963a0a514ba6e77407a08ef4730a65e88254/aerolib.csv) or [supplemental catalog](https://github.com/claimore22/ps5rs/blob/2304be5131221bae0dac24b9767cabffda33f747/data/nids.csv). Data exports need separate analysis.
+- [Additional callable exports](../../../core/libs/prx/libSceNKWebKit/Export.cpp) - 7405 of the 8703 inventory declarations listed below throw through `NotImplemented_nid_no_patch`; signatures and behavior are unverified. The later 13.60-labelled image contains all 8703; 8448 match the public 3.20 catalogue, while 255 are absent and their presence in retail 3.20 is unverified. Per-image records show the latter in a separate 3.20-labelled image, but neither image label is authenticated. Identified names match NIDs in the [public symbol database](https://github.com/zecoxao/sce_symbols/blob/2883963a0a514ba6e77407a08ef4730a65e88254/aerolib.csv) or [supplemental catalog](https://github.com/claimore22/ps5rs/blob/2304be5131221bae0dac24b9767cabffda33f747/data/nids.csv). Data exports need separate analysis.
 
 | Name | NID |
 | --- | --- |
@@ -1584,10 +1584,7 @@
 | `_ZN3WTF11Persistence7EncoderlsEm` | `xGGfdp3gJME` |
 | `_ZN3WTF11Persistence7EncoderlsEs` | `2WpUBRnLMNg` |
 | `_ZN3WTF11Persistence7EncoderlsEt` | `jS+3kWmWE3I` |
-| `_ZN3WTF11PrintStream20printfVariableFormatEPKcz` | `wdbdMn2JHZc` |
 | `_ZN3WTF11PrintStream3endEv` | `FyOMUdXa5Tc` |
-| `_ZN3WTF11PrintStream5beginEv` | `EMO8fbfieRI` |
-| `_ZN3WTF11PrintStream6printfEPKcz` | `Idp+8dpnrr8` |
 | `_ZN3WTF11StackBounds32currentThreadStackBoundsInternalEv` | `ycxHHEa11OI` |
 | `_ZN3WTF11ThreadGroup3addERKNS_14AbstractLockerERNS_6ThreadE` | `wxOWH7WVHa0` |
 | `_ZN3WTF11ThreadGroup3addERNS_6ThreadE` | `yI8ZKsn2NmU` |
@@ -1620,31 +1617,11 @@
 | `_ZN3WTF13StringBuilder16appendCharactersEPKhj` | `E2TkkVyRubQ` |
 | `_ZN3WTF13StringBuilder22appendQuotedJSONStringERKNS_6StringE` | `xJRNEp2d-Wg` |
 | `_ZN3WTF13aboutBlankURLEv` | `3nmBMeZtd+Y` |
-| `_ZN3WTF13dumpCharacterERNS_11PrintStreamEc` | `rpsD9ynfjc0` |
 | `_ZN3WTF13isMainRunLoopEv` | `5K-9Y7aFV60` |
 | `_ZN3WTF13normalizedNFCENS_10StringViewE` | `bgrxJM-HmMM` |
 | `_ZN3WTF13normalizedNFCERKNS_6StringE` | `2LUk8Ch0mJY` |
 | `_ZN3WTF13printInternalERNS_11PrintStreamEN3JSC14TypedArrayModeE` | `DwwpqTcKG0Q` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamENS_10RawPointerE` | `bwThPa6WtDc` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamENS_9ClockTypeE` | `6cO1aKnHM64` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEPKNS_10StringImplE` | `iZmKEESJ3mw` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEPKc` | `P-HGfOZxkgU` |
 | `_ZN3WTF13printInternalERNS_11PrintStreamEPN3JSC9CodeBlockE` | `RFKbaZAsHKs` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamERKNS_6StringE` | `KDRPZeaauUQ` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamERKNS_7CStringE` | `dY5HI1HhX8Q` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEa` | `ejLjAkmwuMc` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEb` | `laF+cd2rvw8` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEd` | `yHE4d2C-Ius` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEf` | `Nvu+-KKztN4` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEh` | `j4qPZlQyJUc` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEi` | `YzM19lL-JGU` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEj` | `BEzuHMRRYIs` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEl` | `OwyHvMkCWP8` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEm` | `d4mB8nRN2tU` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEs` | `TGBn8YLhSro` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEt` | `7WVXLziXGtM` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEx` | `tTW6TdBv6wo` |
-| `_ZN3WTF13printInternalERNS_11PrintStreamEy` | `BiM6ri5fwo8` |
 | `_ZN3WTF14AtomStringImpl10addLiteralEPKcj` | `m+-AT4JRFBw` |
 | `_ZN3WTF14AtomStringImpl11addSlowCaseERNS_10StringImplE` | `47H3Xt0ke9s` |
 | `_ZN3WTF14AtomStringImpl11addSlowCaseERNS_15AtomStringTableERNS_10StringImplE` | `cUU3-6ewPWM` |
@@ -1726,17 +1703,6 @@
 | `_ZN3WTF17GregorianDateTimeC1EdNS_15LocalTimeOffsetE` | `9NbKoZNi0Jo` |
 | `_ZN3WTF17GregorianDateTimeC2EdNS_15LocalTimeOffsetE` | `jRKHSzq25WA` |
 | `_ZN3WTF17PrivateSymbolImpl6createERNS_10StringImplE` | `S6NzIicbleU` |
-| `_ZN3WTF17StringPrintStream11tryToStringEv` | `TrwAHMfEpsw` |
-| `_ZN3WTF17StringPrintStream26toStringWithLatin1FallbackEv` | `cE9rGwgKhic` |
-| `_ZN3WTF17StringPrintStream5resetEv` | `6PPm2rZiMcs` |
-| `_ZN3WTF17StringPrintStream7vprintfEPKcP13__va_list_tag` | `iXgnlJmCSP4` |
-| `_ZN3WTF17StringPrintStream8toStringEv` | `52xCgnSgAkY` |
-| `_ZN3WTF17StringPrintStream9toCStringEv` | `7RZABO0cMFI` |
-| `_ZN3WTF17StringPrintStreamC1Ev` | `wNhdQWqZALM` |
-| `_ZN3WTF17StringPrintStreamC2Ev` | `zQLVD+vqI0Y` |
-| `_ZN3WTF17StringPrintStreamD0Ev` | `eSdAHApUsso` |
-| `_ZN3WTF17StringPrintStreamD1Ev` | `EOmLhk6TiW4` |
-| `_ZN3WTF17StringPrintStreamD2Ev` | `DyzD9dy1J9M` |
 | `_ZN3WTF17callOnMainRunLoopEONS_8FunctionIFvvEEE` | `9v4s2WAlWKI` |
 | `_ZN3WTF17double_conversion23DoubleToStringConverter19EcmaScriptConverterEv` | `vYLd9fXeOkc` |
 | `_ZN3WTF17languageDidChangeEv` | `6kL-6MlnOos` |
