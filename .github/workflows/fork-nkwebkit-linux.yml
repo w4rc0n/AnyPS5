@@ -1,0 +1,72 @@
+name: Fork NKWebKit Linux
+
+on:
+  push:
+    branches: [ci/fork-nkwebkit-linux]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CONFIGURE: >-
+    -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+    -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
+    -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+jobs:
+  nkwebkit:
+    name: ${{ matrix.branch }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - branch: feat/nkwebkit-filesystem-handles
+            head: 4179fef3b47aed47e6ace92a1178c9b8cb69948c
+          - branch: feat/nkwebkit-filesystem-paths
+            head: c6239ff3daf17b2ce0b7c9a94bb583a9c4a06939
+          - branch: feat/nkwebkit-filesystem-mapped
+            head: e403b976014319fc79978786c071579efd2ee79a
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.head }}
+          persist-credentials: false
+      - name: Check that the checkout is the pushed head
+        run: test "$(git rev-parse HEAD)" = "${{ matrix.head }}"
+      - name: Check out the submodules
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Install the build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libx11-dev libxext-dev libxrandr-dev libasound2-dev libpulse-dev mesa-vulkan-drivers
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          key: fork-nkwebkit-linux-${{ matrix.head }}
+          max-size: 2G
+      - name: Report the environment
+        run: |
+          uname -a
+          gcc --version | head -1
+          cmake --version | head -1
+          nproc
+      - run: cmake -S . -B build $CONFIGURE
+      - name: Build the NKWebKit tests and the patched libraries
+        run: |
+          targets=$(ninja -C build -t targets all | grep -oE '^(guest_)?nkwebkit_[a-z_]+_tests' | sort -u | tr '\n' ' ')
+          echo "targets: $targets"
+          cmake --build build --target $targets patched_libraries_tests libs
+      - name: Run the NKWebKit tests, public_headers and patched_libraries
+        run: ctest --test-dir build -R '^(nkwebkit_.*|guest_nkwebkit_.*|public_headers|patched_libraries)$' --output-on-failure --timeout 120 --output-log "$GITHUB_WORKSPACE/ctest.log"
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ctest-${{ matrix.head }}
+          path: ctest.log
+          if-no-files-found: warn
