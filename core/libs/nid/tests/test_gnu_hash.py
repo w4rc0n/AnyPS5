@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from test_symbol_versions import build_image, symbols, patch, HASH_OFFSET, SHOFF, read_dynsym, gnu_hash, sections, PATCHER
+from test_symbol_versions import build_image, symbols, patch, HASH_OFFSET, SHOFF, VERSYM_OFFSET, SHT_GNU_VERSYM, read_dynsym, gnu_hash, sections, PATCHER
 
 
 def sysv_hash(name):
@@ -94,6 +94,39 @@ class GnuHashTests(unittest.TestCase):
         result, after = patch(PATCHER, image, "empty.so")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(struct.unpack_from("<I", after, HASH_OFFSET)[0], 0)
+
+    def versioned_image(self):
+        image = self.image()
+        count = len(symbols(False))
+        struct.pack_into("<H", image, 0x3C, 5)
+        struct.pack_into("<IIQQQQIIQQ", image, SHOFF + 4 * 64,
+                         0, SHT_GNU_VERSYM, 2, 0, VERSYM_OFFSET, count * 2, 1, 0, 2, 2)
+        versions = [0, 2, 0x8003] + list(range(4, count + 1))
+        struct.pack_into(f"<{count}H", image, VERSYM_OFFSET, *versions)
+        return image, versions
+
+    def test_symbol_versions_follow_reordered_symbols(self):
+        image, versions = self.versioned_image()
+        before = read_dynsym(image)
+        result, after = patch(PATCHER, image, "version-indexes.so")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        entries = read_dynsym(after)
+        self.assertNotEqual([entry[2] for entry in entries], [entry[2] for entry in before])
+        expected = {(value if shndx else name): version for (name, shndx, value), version in zip(before, versions)}
+        actual = struct.unpack_from(f"<{len(entries)}H", after, VERSYM_OFFSET)
+        for (name, shndx, value), version in zip(entries, actual):
+            self.assertEqual(version, expected[value if shndx else name])
+
+    def test_invalid_symbol_version_layout_is_rejected_without_writing(self):
+        for field, format, value in ((32, "<Q", 2), (24, "<Q", 0x10000),
+                                     (40, "<I", 2), (56, "<Q", 1)):
+            with self.subTest(field=field):
+                image, _ = self.versioned_image()
+                struct.pack_into(format, image, SHOFF + 4 * 64 + field, value)
+                result, after = patch(PATCHER, image, "invalid-version-indexes.so")
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(b".gnu.version", result.stderr)
+                self.assertEqual(after, image)
 
 
 @unittest.skipUnless(PATCHER is not None and PATCHER.is_file(), "nid_patcher executable required")

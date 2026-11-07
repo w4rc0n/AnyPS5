@@ -369,7 +369,8 @@ void ElfNidPatcher::PatchNids(std::vector<std::uint8_t>& elf, const std::string&
     std::size_t gnuHashOffset = 0u, gnuHashSize = 0u;
     std::size_t sysvHashOffset = 0u, sysvHashSize = 0u;
     std::uint32_t sysvHashLink = 0u;
-    std::size_t versymOffset = 0u;
+    std::size_t versymOffset = 0u, versymSize = 0u;
+    std::uint32_t versymLink = 0u;
     bool hasDynamic = false;
     std::uint32_t dynSymSectionIndex = 0u;
     std::uint32_t gnuHashSymOffset = 0u;
@@ -394,8 +395,14 @@ void ElfNidPatcher::PatchNids(std::vector<std::uint8_t>& elf, const std::string&
             sysvHashSize = static_cast<std::size_t>(shdr.sh_size);
             sysvHashLink = shdr.sh_link;
         }
-        if (shdr.sh_type == kShtGnuVersym)
+        if (shdr.sh_type == kShtGnuVersym) {
+            if (shdr.sh_entsize != sizeof(std::uint16_t))
+                throw std::runtime_error("invalid .gnu.version entry size");
+            RequireElfRange(elf, shdr.sh_offset, shdr.sh_size, ".gnu.version");
             versymOffset = static_cast<std::size_t>(shdr.sh_offset);
+            versymSize = static_cast<std::size_t>(shdr.sh_size);
+            versymLink = shdr.sh_link;
+        }
         if (shdr.sh_type == kShtGnuVerdef)
             throw std::runtime_error("unsupported .gnu.version_d section: symbol version definitions cannot be preserved");
     }
@@ -417,6 +424,8 @@ void ElfNidPatcher::PatchNids(std::vector<std::uint8_t>& elf, const std::string&
 
     const std::size_t symCount = dynSymSize / sizeof(Elf64_Sym);
     if (symCount == 0u) throw std::runtime_error(".dynsym is empty");
+    if (versymOffset != 0u && (versymSize != symCount * sizeof(std::uint16_t) || versymLink != dynSymSectionIndex))
+        throw std::runtime_error("invalid .gnu.version symbol table layout");
     if (sysvHashOffset != 0u) {
         if (sysvHashLink != dynSymSectionIndex) throw std::runtime_error("invalid ELF hash symbol table link");
         ValidateSysvHash(elf, sysvHashOffset, sysvHashSize, symCount);
@@ -638,6 +647,13 @@ void ElfNidPatcher::PatchNids(std::vector<std::uint8_t>& elf, const std::string&
         const auto bucketCount = Read<std::uint32_t>(elf, gnuHashOffset);
         std::vector<std::uint32_t> oldToNewIndex(symCount);
         ReorderDynSymForGnuHash(elf, dynSymOffset, symCount, gnuHashSymOffset, bucketCount, newSymbolNames, oldToNewIndex);
+        if (versymOffset != 0u) {
+            std::vector<std::uint16_t> versions(symCount);
+            for (std::size_t i = 0u; i < symCount; ++i)
+                versions[oldToNewIndex[i]] = Read<std::uint16_t>(elf, versymOffset + i * sizeof(std::uint16_t));
+            for (std::size_t i = 0u; i < symCount; ++i)
+                Write(elf, versymOffset + i * sizeof(std::uint16_t), versions[i]);
+        }
         FixupRelocationSymbolIndices(elf, ehdr, dynSymSectionIndex, oldToNewIndex);
         RebuildGnuHash(elf, gnuHashOffset, gnuHashSize, symCount, newSymbolNames);
     }
