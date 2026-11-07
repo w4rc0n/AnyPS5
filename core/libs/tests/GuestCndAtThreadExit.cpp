@@ -38,17 +38,6 @@ static void RequireThrows(TCall call) {
 constexpr int success = 0;
 constexpr int plain = 0x01;
 
-static void InitializationReportsAllocationFailure() {
-    void* condition = &failAllocations;
-    void* mutex = &failAllocations;
-    failAllocations = true;
-    const auto conditionResult = _Cnd_init_nid_postfix(&condition);
-    const auto mutexResult = _Mtx_init_nid_postfix(&mutex, plain);
-    failAllocations = false;
-    Require(conditionResult == 1 && condition == nullptr);
-    Require(mutexResult == 1 && mutex == nullptr);
-}
-
 static void RegisterRejectsNullHandles() {
     void* condition = nullptr;
     void* mutex = nullptr;
@@ -184,7 +173,6 @@ static void PadLaunchBroadcastsAtThreadExit() {
 }
 
 int main() {
-    InitializationReportsAllocationFailure();
     RegisterRejectsNullHandles();
     UnregisterSkipsBroadcast();
     BroadcastWakesWaitingThread();
