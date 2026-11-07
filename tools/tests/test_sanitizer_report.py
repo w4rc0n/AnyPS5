@@ -276,6 +276,21 @@ class RepositoryKnownFailuresTests(unittest.TestCase):
         names = [line.split(None, 1)[0] for line in KNOWN_FAILURES.read_text(encoding="utf-8").splitlines() if line.strip()]
         self.assertEqual(names, sorted(names))
 
+    def test_recorder_and_vad_failures_remain_visible_and_sanitizer_scoped(self):
+        known = sanitizer_report.load_known(KNOWN_FAILURES, ["address", "undefined"])
+        found = {"agc_driver_recorder": "failed", "guest_webrtc_vad": "failed"}
+        text, failing = sanitizer_report.summarize("ASan and UBSan", found, known)
+        self.assertFalse(failing)
+        self.assertIn("2 failed (2 known)", text)
+        self.assertIn("| `agc_driver_recorder` |", text)
+        self.assertIn("| `guest_webrtc_vad` |", text)
+        address = sanitizer_report.load_known(KNOWN_FAILURES, ["address"])
+        self.assertNotIn("guest_webrtc_vad", address)
+        _, failing = sanitizer_report.summarize("ASan", {"guest_webrtc_vad": "failed"}, address)
+        self.assertTrue(failing)
+        _, failing = sanitizer_report.summarize("ASan and UBSan", {**found, "new_bug": "failed"}, known)
+        self.assertTrue(failing)
+
 
 
 class SummaryInputAliasTests(unittest.TestCase):

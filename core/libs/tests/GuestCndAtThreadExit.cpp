@@ -14,8 +14,14 @@ void* operator new(std::size_t size) {
     throw std::bad_alloc();
 }
 
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept {
+    if (failAllocations) return nullptr;
+    return std::malloc(size ? size : 1);
+}
+
 void operator delete(void* memory) noexcept { std::free(memory); }
 void operator delete(void* memory, std::size_t) noexcept { std::free(memory); }
+void operator delete(void* memory, const std::nothrow_t&) noexcept { std::free(memory); }
 
 static void Require(bool value) { if (!value) std::abort(); }
 
@@ -31,6 +37,17 @@ static void RequireThrows(TCall call) {
 
 constexpr int success = 0;
 constexpr int plain = 0x01;
+
+static void InitializationReportsAllocationFailure() {
+    void* condition = &failAllocations;
+    void* mutex = &failAllocations;
+    failAllocations = true;
+    const auto conditionResult = _Cnd_init_nid_postfix(&condition);
+    const auto mutexResult = _Mtx_init_nid_postfix(&mutex, plain);
+    failAllocations = false;
+    Require(conditionResult == 1 && condition == nullptr);
+    Require(mutexResult == 1 && mutex == nullptr);
+}
 
 static void RegisterRejectsNullHandles() {
     void* condition = nullptr;
@@ -167,6 +184,7 @@ static void PadLaunchBroadcastsAtThreadExit() {
 }
 
 int main() {
+    InitializationReportsAllocationFailure();
     RegisterRejectsNullHandles();
     UnregisterSkipsBroadcast();
     BroadcastWakesWaitingThread();
